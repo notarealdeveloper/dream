@@ -27,6 +27,8 @@ The alignment is provisional. It uses a monotonic dynamic-programming pass over 
 
 Correct alignments in `data/alignment.jsonl` or improve `scripts/build.py`, then regenerate with `make data`.
 
+Chapter paintings are generated from `img/chapters/*.jpg`. The chapter number is parsed from the `第N回` marker in each filename, and images are interspersed at even verse intervals inside that chapter. Do not hand-edit `\ChapterImage` calls into `01-book-one/*.tex` or `02-book-two/*.tex`; those files are generated and replaced by `make data`.
+
 Run regression checks with:
 
 ```sh

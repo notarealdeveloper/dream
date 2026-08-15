@@ -28,6 +28,7 @@ EN_FILES = [
 DATA_DIR = ROOT / "data"
 BOOK_ONE = ROOT / "01-book-one"
 BOOK_TWO = ROOT / "02-book-two"
+CHAPTER_IMAGE_DIR = ROOT / "img" / "chapters"
 
 
 ROMAN = {
@@ -396,7 +397,33 @@ def wrap_macro(name: str, text: str, width: int = 76) -> str:
     return "\\%s{%s}" % (name, ("\n        ").join(wrapped))
 
 
-def emit_tex(rows_by_chapter: dict[int, list[dict]]) -> None:
+def image_chapter(path: Path) -> int:
+    match = re.search(r"第(\d+)(?:-\d+)?回", path.name)
+    if not match:
+        raise ValueError(f"chapter image filename does not contain a chapter marker: {path}")
+    chapter = int(match.group(1))
+    if not 1 <= chapter <= 120:
+        raise ValueError(f"chapter image filename has out-of-range chapter {chapter}: {path}")
+    return chapter
+
+
+def chapter_images() -> dict[int, list[Path]]:
+    images: dict[int, list[Path]] = {chapter: [] for chapter in range(1, 121)}
+    for path in sorted(CHAPTER_IMAGE_DIR.glob("*.jpg")):
+        images[image_chapter(path)].append(path.relative_to(ROOT))
+    return images
+
+
+def image_after_verses(rows: list[dict], images: list[Path]) -> dict[int, list[Path]]:
+    total = len(rows)
+    placements: dict[int, list[Path]] = {}
+    for i, image in enumerate(images, start=1):
+        after = max(1, round(total * i / (len(images) + 1)))
+        placements.setdefault(after, []).append(image)
+    return placements
+
+
+def emit_tex(rows_by_chapter: dict[int, list[dict]], images_by_chapter: dict[int, list[Path]]) -> None:
     for d in (BOOK_ONE, BOOK_TWO):
         d.mkdir(exist_ok=True)
         for old in d.glob("*.tex"):
@@ -404,6 +431,7 @@ def emit_tex(rows_by_chapter: dict[int, list[dict]]) -> None:
     for chapter, rows in rows_by_chapter.items():
         out_dir = BOOK_ONE if chapter <= 80 else BOOK_TWO
         path = out_dir / f"{chapter:03d}.tex"
+        images_after_verse = image_after_verses(rows, images_by_chapter.get(chapter, []))
         lines = [f"\\Chapter{{{chapter}}}", ""]
         for row in rows:
             prefix = "R" if row["source_profile"] == "Redactor" else "A"
@@ -422,6 +450,13 @@ def emit_tex(rows_by_chapter: dict[int, list[dict]]) -> None:
                     "",
                 ]
             )
+            images = images_after_verse.get(row["verse"], [])
+            if images:
+                lines.pop()
+                for image in images:
+                    lines.append(f"\\ChapterImage{{{image.as_posix()}}}")
+                lines.append("")
+                lines.append("")
         path.write_text("\n".join(lines), encoding="utf-8")
 
 
@@ -576,6 +611,7 @@ def emit_master() -> None:
 \\newcommand{{\\VerseColumns}}[2]{{\\noindent\\VerseEnglishAtWidth{{\\VerseColWidth}}{{#1}}\\hspace{{\\VerseGap}}{{\\color{{RuleColor}}\\vrule width \\VerseRuleWidth}}\\hspace{{\\VerseGap}}\\VerseChineseAtWidth{{\\VerseColWidth}}{{#2}}\\par}}
 \\newcommand{{\\VerseRule}}{{{{\\color{{RuleColor}}\\hrule}}}}
 \\newcommand{{\\Verse}}[4]{{\\par\\vspace{{0.8em}}\\Needspace{{6\\baselineskip}}\\VerseRule\\vspace{{0.25em}}{{\\centering \\large \\hyperlink{{chapter.\\CurrentBook.\\CurrentChapter}}{{\\CurrentBook\\ \\CurrentChapter:#1}}\\par}}\\vspace{{0.8em}}\\VerseRule\\vspace{{0.3em}}\\begingroup\\hbadness=10000\\hfuzz=3em\\VerseColumns{{#3}}{{#2}}\\endgroup\\vspace{{0.8em}}\\ifConfigCommentaryOn\\begingroup\\hbadness=10000\\hfuzz=3em#4\\par\\endgroup\\vspace{{0.8em}}\\fi}}
+\\newcommand{{\\ChapterImage}}[1]{{\\par\\vspace{{1.2em}}\\Needspace{{0.56\\textheight}}\\begin{{center}}\\includegraphics[width=0.96\\textwidth,height=0.52\\textheight,keepaspectratio]{{#1}}\\end{{center}}\\vspace{{1.2em}}\\par}}
 
 \\begin{{document}}
 \\frontmatter
@@ -627,6 +663,8 @@ The alignment is provisional. It uses a monotonic dynamic-programming pass over 
 
 Correct alignments in `data/alignment.jsonl` or improve `scripts/build.py`, then regenerate with `make data`.
 
+Chapter paintings are generated from `img/chapters/*.jpg`. The chapter number is parsed from the `第N回` marker in each filename, and images are interspersed at even verse intervals inside that chapter. Do not hand-edit `\\ChapterImage` calls into `01-book-one/*.tex` or `02-book-two/*.tex`; those files are generated and replaced by `make data`.
+
 Run regression checks with:
 
 ```sh
@@ -664,6 +702,13 @@ def validate(rows_by_chapter: dict[int, list[dict]], zh_chapters: dict[int, str]
             assert len(en_join) >= len(en_src) * 0.94, f"chapter {n} lost too much English"
     assert any(r["source_profile"] == "Author" for rows in rows_by_chapter.values() for r in rows)
     assert any(r["source_profile"] == "Redactor" for rows in rows_by_chapter.values() for r in rows)
+    emitted_images = "\n".join(
+        ((BOOK_ONE if n <= 80 else BOOK_TWO) / f"{n:03d}.tex").read_text(encoding="utf-8")
+        for n in range(1, 121)
+    )
+    for images in chapter_images().values():
+        for image in images:
+            assert f"\\ChapterImage{{{image.as_posix()}}}" in emitted_images, f"missing generated image include: {image}"
 
 
 def main() -> None:
@@ -683,7 +728,7 @@ def main() -> None:
         "Later English is intentionally marked source-missing rather than invented.\n",
         encoding="utf-8",
     )
-    emit_tex(rows_by_chapter)
+    emit_tex(rows_by_chapter, chapter_images())
     emit_master()
     emit_readme(en_chapters)
     validate(rows_by_chapter, zh_chapters, en_chapters)
