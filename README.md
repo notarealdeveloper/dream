@@ -21,9 +21,19 @@ make
 
 `scripts/build.py` parses both source corpora, segments Chinese on sentence punctuation, segments English with a lightweight abbreviation-aware splitter, and produces monotonic verse-like alignment records in `data/alignment.jsonl`.
 
-The alignment is provisional. It groups adjacent Chinese and English segments by cumulative character mass and bounded 1:1, 1:2, 2:1, 2:2, 1:3, and 3:1 moves. It is meant to produce a complete editable edition, not a final scholarly alignment.
+Chinese `。` is the preferred prose verse boundary. The aligner keeps Chinese sentence units short by default and lets each Chinese verse absorb the best nearby English span. The English side may therefore contain a fragment, a full sentence, several fragments, or no clean English unit when the sources do not line up neatly.
+
+The alignment is provisional. It uses a monotonic dynamic-programming pass over Chinese sentence units and neighboring English spans, with cumulative position, length balance, and a small curated name/term table as signals. It is meant to produce a complete editable edition, not a final scholarly alignment.
 
 Correct alignments in `data/alignment.jsonl` or improve `scripts/build.py`, then regenerate with `make data`.
+
+Run regression checks with:
+
+```sh
+make check
+```
+
+The pytest suite in `tests/` checks source preservation, monotonic source spans, short Chinese verse boundaries, chapter boundary anchors, and curated bilingual anchors. Add a known-good correspondence by extending the anchor tables in `tests/test_alignment.py` after confirming the Chinese and English wording in the source files.
 
 ## Source Profiles
 

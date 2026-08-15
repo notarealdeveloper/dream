@@ -13,6 +13,7 @@ alignment data; the script does not invent English.
 from __future__ import annotations
 
 import json
+import math
 import re
 import textwrap
 from dataclasses import dataclass
@@ -55,6 +56,30 @@ ABBREVIATIONS = {
 class Segment:
     text: str
     index: int
+    start: int
+    end: int
+
+
+NAME_ANCHORS = {
+    "甄士隐": ("Chen Shih-yin", "Shih-yin"),
+    "贾雨村": ("Chia Yü-ts'un", "Yü-ts'un"),
+    "林黛玉": ("Lin Tai-yü", "Tai-yü"),
+    "贾宝玉": ("Chia Pao-yü", "Pao-yü"),
+    "薛宝钗": ("Hsüeh Pao-ch'ai", "Pao-ch'ai"),
+    "王熙凤": ("Wang Hsi-feng", "Hsi-feng"),
+    "刘姥姥": ("old goody Liu", "Goody Liu", "Liu"),
+    "大观园": ("Ta Kuan", "Prospect Garden"),
+    "太虚幻境": ("Great Void", "Illusory Land"),
+    "通灵宝玉": ("Precious Jade", "Spiritual Jade"),
+    "妙玉": ("Miao-yü",),
+    "香菱": ("Hsiang-ling",),
+    "晴雯": ("Ch'ing-wen",),
+    "袭人": ("Hsi Jen", "Hsi-jen"),
+    "探春": ("T'an-ch'un",),
+    "宝琴": ("Pao-ch'in",),
+}
+
+ZH_SENTENCE_END_RE = re.compile(r".+?[。！？]+[”’』」》）\])]*|.+$", re.S)
 
 
 def roman_to_int(s: str) -> int:
@@ -130,20 +155,24 @@ def read_en_chapters() -> dict[int, str]:
 
 
 def split_zh(text: str) -> list[Segment]:
-    pieces = [
-        m.group(0).strip()
-        for m in re.finditer(r".+?[。！？；]+[”’』」》）\])]*|.+$", text, flags=re.S)
-        if m.group(0).strip()
-    ]
-    return merge_tiny([p for p in pieces if p], min_len=12, max_len=220)
+    segments: list[Segment] = []
+    for match in ZH_SENTENCE_END_RE.finditer(text):
+        raw = match.group(0)
+        stripped = raw.strip()
+        if not stripped:
+            continue
+        start = match.start() + len(raw) - len(raw.lstrip())
+        end = match.end() - len(raw) + len(raw.rstrip())
+        segments.append(Segment(text=stripped, index=len(segments), start=start, end=end))
+    return segments
 
 
 def split_en(text: str) -> list[Segment]:
-    text = re.sub(r"\n+", " ", text)
-    pieces: list[str] = []
+    text = re.sub(r"\s+", " ", text).strip()
+    pieces: list[tuple[str, int, int]] = []
     start = 0
     for i, ch in enumerate(text):
-        if ch not in ".!?;":
+        if ch not in ".!?;:,":
             continue
         token = text[max(0, i - 12) : i + 1].split()[-1]
         if token in ABBREVIATIONS or re.fullmatch(r"(?:[A-Z]\.)+", token):
@@ -155,28 +184,37 @@ def split_en(text: str) -> list[Segment]:
             continue
         piece = text[start:j].strip()
         if piece:
-            pieces.append(piece)
+            offset = len(text[start:j]) - len(text[start:j].lstrip())
+            pieces.append((piece, start + offset, j))
         start = j
     tail = text[start:].strip()
     if tail:
-        pieces.append(tail)
-    return merge_tiny(pieces, min_len=45, max_len=420)
+        offset = len(text[start:]) - len(text[start:].lstrip())
+        pieces.append((tail, start + offset, len(text)))
+    return merge_tiny(pieces, min_len=24, max_len=180)
 
 
-def merge_tiny(pieces: list[str], min_len: int, max_len: int) -> list[Segment]:
-    merged: list[str] = []
+def merge_tiny(pieces: list[tuple[str, int, int]], min_len: int, max_len: int) -> list[Segment]:
+    merged: list[tuple[str, int, int]] = []
     buf = ""
-    for piece in pieces:
+    buf_start = 0
+    buf_end = 0
+    for piece, start, end in pieces:
         if not buf:
             buf = piece
-        elif len(buf) < min_len or len(buf) + len(piece) < max_len:
+            buf_start = start
+            buf_end = end
+        elif len(buf) < min_len and len(buf) + 1 + len(piece) < max_len:
             buf = f"{buf} {piece}"
+            buf_end = end
         else:
-            merged.append(buf)
+            merged.append((buf, buf_start, buf_end))
             buf = piece
+            buf_start = start
+            buf_end = end
     if buf:
-        merged.append(buf)
-    return [Segment(text=p, index=i) for i, p in enumerate(merged)]
+        merged.append((buf, buf_start, buf_end))
+    return [Segment(text=p, index=i, start=start, end=end) for i, (p, start, end) in enumerate(merged)]
 
 
 def char_mass(text: str) -> int:
@@ -184,6 +222,60 @@ def char_mass(text: str) -> int:
     han = sum(1 for ch in text if "\u4e00" <= ch <= "\u9fff")
     other = sum(1 for ch in text if not ch.isspace()) - latin - han
     return han * 2 + latin + other
+
+
+def prefix_masses(segments: list[Segment]) -> list[int]:
+    masses = [0]
+    total = 0
+    for segment in segments:
+        total += char_mass(segment.text)
+        masses.append(total)
+    return masses
+
+
+def semantic_bonus(zh_text: str, en_text: str) -> float:
+    en_folded = en_text.casefold()
+    bonus = 0.0
+    for zh_anchor, en_anchors in NAME_ANCHORS.items():
+        if zh_anchor not in zh_text:
+            continue
+        if any(anchor.casefold() in en_folded for anchor in en_anchors):
+            bonus += 0.18
+        else:
+            bonus -= 0.08
+    return bonus
+
+
+def english_span_text(en: list[Segment], start: int, end: int) -> str:
+    return " ".join(s.text for s in en[start:end]).strip()
+
+
+def alignment_score(
+    zh: list[Segment],
+    en: list[Segment],
+    zh_prefix: list[int],
+    en_prefix: list[int],
+    zi: int,
+    ei: int,
+    ec: int,
+) -> float:
+    total_zh = zh_prefix[-1] or 1
+    total_en = en_prefix[-1] or 1
+    z_share = (zh_prefix[zi + 1] - zh_prefix[zi]) / total_zh
+    e_share = (en_prefix[ei + ec] - en_prefix[ei]) / total_en if ec else 0.0
+    z_next = zh_prefix[zi + 1] / total_zh
+    e_next = en_prefix[ei + ec] / total_en if en else 1.0
+    position = abs(z_next - e_next)
+    if ec:
+        ratio = abs(math.log((e_share + 0.0001) / (z_share + 0.0001)))
+        grouping = 0.012 * max(0, ec - 1) ** 2
+        empty = 0.0
+    else:
+        ratio = 1.0
+        grouping = 0.0
+        empty = 0.28
+    text_bonus = semantic_bonus(zh[zi].text, english_span_text(en, ei, ei + ec)) if ec else 0.0
+    return position * 2.4 + ratio * 0.24 + grouping + empty - text_bonus
 
 
 def align_chapter(chapter: int, zh: list[Segment], en: list[Segment]) -> list[dict]:
@@ -198,49 +290,69 @@ def align_chapter(chapter: int, zh: list[Segment], en: list[Segment]) -> list[di
                 "source_profile": "Redactor" if chapter > 80 else "Author",
                 "confidence": 0.0,
                 "zh_indices": [seg.index],
+                "zh_start": seg.start,
+                "zh_end": seg.end,
                 "en_indices": [],
+                "en_start": None,
+                "en_end": None,
                 "note": "English source not present in checked-in Bencraft/Joly files.",
             }
             for i, seg in enumerate(zh)
         ]
 
-    total_zh = sum(char_mass(s.text) for s in zh) or 1
-    total_en = sum(char_mass(s.text) for s in en) or 1
-    rows: list[dict] = []
-    zi = 0
-    ei = 0
-    verse = 1
-    while zi < len(zh) or ei < len(en):
-        if zi >= len(zh):
-            zg: list[Segment] = []
-            eg = en[ei : min(len(en), ei + 2)]
-        elif ei >= len(en):
-            zg = zh[zi : min(len(zh), zi + 2)]
-            eg = []
-        else:
-            best: tuple[float, int, int] | None = None
-            for zc in range(1, min(3, len(zh) - zi) + 1):
-                z_mass = sum(char_mass(s.text) for s in zh[zi : zi + zc])
-                z_next = (sum(char_mass(s.text) for s in zh[: zi + zc])) / total_zh
-                for ec in range(1, min(3, len(en) - ei) + 1):
-                    e_mass = sum(char_mass(s.text) for s in en[ei : ei + ec])
-                    e_next = (sum(char_mass(s.text) for s in en[: ei + ec])) / total_en
-                    ratio = abs((z_mass / total_zh) - (e_mass / total_en))
-                    pos = abs(z_next - e_next)
-                    group = 0.02 * (zc + ec - 2)
-                    score = ratio * 0.7 + pos * 0.3 + group
-                    if best is None or score < best[0]:
-                        best = (score, zc, ec)
-            assert best is not None
-            _, zc, ec = best
-            zg = zh[zi : zi + zc]
-            eg = en[ei : ei + ec]
+    max_en_span = 8
+    beam_width = 90
+    zh_prefix = prefix_masses(zh)
+    en_prefix = prefix_masses(en)
+    n = len(zh)
+    m = len(en)
+    costs: list[dict[int, tuple[float, int | None]]] = [{0: (0.0, None)}]
+    for zi in range(n):
+        current = costs[-1]
+        next_costs: dict[int, tuple[float, int | None]] = {}
+        remaining_zh_after = n - zi - 1
+        for ei, (base_cost, _) in current.items():
+            min_ec = max(0, m - ei - remaining_zh_after * max_en_span)
+            max_ec = min(max_en_span, m - ei)
+            for ec in range(min_ec, max_ec + 1):
+                if ec == 0 and remaining_zh_after == 0 and ei < m:
+                    continue
+                score = base_cost + alignment_score(zh, en, zh_prefix, en_prefix, zi, ei, ec)
+                ej = ei + ec
+                previous = next_costs.get(ej)
+                if previous is None or score < previous[0]:
+                    next_costs[ej] = (score, ei)
+        if zi < n - 1 and len(next_costs) > beam_width:
+            expected = m * ((zi + 1) / n)
+            ranked = sorted(
+                next_costs.items(),
+                key=lambda item: item[1][0] + 0.015 * abs(item[0] - expected),
+            )
+            next_costs = dict(ranked[:beam_width])
+        costs.append(next_costs)
 
-        zh_text = " ".join(s.text for s in zg).strip()
-        en_text = " ".join(s.text for s in eg).strip()
-        z_share = sum(char_mass(s.text) for s in zg) / total_zh if zg else 0
+    if m not in costs[-1]:
+        raise AssertionError(f"chapter {chapter} alignment failed to consume English")
+
+    spans: list[tuple[int, int]] = []
+    ei = m
+    for zi in range(n, 0, -1):
+        _, prev_ei = costs[zi][ei]
+        assert prev_ei is not None
+        spans.append((prev_ei, ei))
+        ei = prev_ei
+    spans.reverse()
+
+    rows: list[dict] = []
+    total_zh = zh_prefix[-1] or 1
+    total_en = en_prefix[-1] or 1
+    for verse, (seg, (en_start_i, en_end_i)) in enumerate(zip(zh, spans), start=1):
+        eg = en[en_start_i:en_end_i]
+        zh_text = seg.text
+        en_text = english_span_text(en, en_start_i, en_end_i)
+        z_share = char_mass(zh_text) / total_zh
         e_share = sum(char_mass(s.text) for s in eg) / total_en if eg else 0
-        confidence = max(0.05, min(0.95, 1.0 - abs(z_share - e_share) * 12 - 0.04 * (len(zg) + len(eg) - 2)))
+        confidence = max(0.05, min(0.95, 1.0 - abs(z_share - e_share) * 16 - (0.04 * max(0, len(eg) - 1)) - (0.2 if not eg else 0)))
         rows.append(
             {
                 "book": 1 if chapter <= 80 else 2,
@@ -250,13 +362,14 @@ def align_chapter(chapter: int, zh: list[Segment], en: list[Segment]) -> list[di
                 "en": en_text,
                 "source_profile": "Redactor" if chapter > 80 else "Author",
                 "confidence": round(confidence, 3),
-                "zh_indices": [s.index for s in zg],
+                "zh_indices": [seg.index],
+                "zh_start": seg.start,
+                "zh_end": seg.end,
                 "en_indices": [s.index for s in eg],
+                "en_start": eg[0].start if eg else None,
+                "en_end": eg[-1].end if eg else None,
             }
         )
-        zi += len(zg)
-        ei += len(eg)
-        verse += 1
     return rows
 
 
@@ -475,9 +588,9 @@ def emit_master() -> None:
 \\mainmatter
 \\hypersetup{{pageanchor=true}}
 \\pagestyle{{fancy}}
-\\Book{{Book I -- Shi Tou Ji}}{{1}}{{80}}
+\\Book{{石頭記}}{{1}}{{80}}
 {includes_1}
-\\Book{{Book II -- Later Continuation}}{{81}}{{120}}
+\\Book{{後四十回}}{{81}}{{120}}
 {includes_2}
 \\end{{document}}
 """
@@ -508,9 +621,19 @@ make
 
 `scripts/build.py` parses both source corpora, segments Chinese on sentence punctuation, segments English with a lightweight abbreviation-aware splitter, and produces monotonic verse-like alignment records in `data/alignment.jsonl`.
 
-The alignment is provisional. It groups adjacent Chinese and English segments by cumulative character mass and bounded 1:1, 1:2, 2:1, 2:2, 1:3, and 3:1 moves. It is meant to produce a complete editable edition, not a final scholarly alignment.
+Chinese `。` is the preferred prose verse boundary. The aligner keeps Chinese sentence units short by default and lets each Chinese verse absorb the best nearby English span. The English side may therefore contain a fragment, a full sentence, several fragments, or no clean English unit when the sources do not line up neatly.
+
+The alignment is provisional. It uses a monotonic dynamic-programming pass over Chinese sentence units and neighboring English spans, with cumulative position, length balance, and a small curated name/term table as signals. It is meant to produce a complete editable edition, not a final scholarly alignment.
 
 Correct alignments in `data/alignment.jsonl` or improve `scripts/build.py`, then regenerate with `make data`.
+
+Run regression checks with:
+
+```sh
+make check
+```
+
+The pytest suite in `tests/` checks source preservation, monotonic source spans, short Chinese verse boundaries, chapter boundary anchors, and curated bilingual anchors. Add a known-good correspondence by extending the anchor tables in `tests/test_alignment.py` after confirming the Chinese and English wording in the source files.
 
 ## Source Profiles
 

@@ -9,7 +9,7 @@ TEX_SOURCES := $(shell find . -path './build' -prune -o -name '*.tex' -print)
 
 export TEXMFVAR = $(CACHE)
 
-.PHONY: all pdf data align tex validate clean distclean
+.PHONY: all pdf data align tex validate check clean distclean
 
 all: pdf
 
@@ -17,6 +17,9 @@ pdf: data $(PDF)
 
 data align tex validate:
 	python3 scripts/build.py
+
+check: data
+	python3 -m pytest tests
 
 $(PDF): $(TEX_SOURCES)
 	@mkdir -p "$(BUILD)" "$(CACHE)" "$(BUILD)/01-book-one" "$(BUILD)/02-book-two"
