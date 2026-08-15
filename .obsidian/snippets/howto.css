@@ -1,0 +1,21 @@
+/*******************************
+ *** how to use obsidian css ***
+ *******************************/
+
+/* to modify something... */
+
+/* in local reading view and obsidian publish */
+.markdown-preview-view .tag {
+    /* put it here */
+}
+
+/* in obsidian publish only */
+.publish-renderer .markdown-preview-view .tag {
+    /* put it here */
+}
+
+/* in the local app only (not in obsidian publish) */
+.app-container .markdown-preview-view .tag {
+    /* the app's browser has .app-container, obsidian publish doesn't */
+}
+

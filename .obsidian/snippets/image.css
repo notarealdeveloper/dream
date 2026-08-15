@@ -1,0 +1,19 @@
+/* image styles */
+
+img.w100 {
+  width: 100% !important;
+  height: auto !important;
+  display: block;
+}
+
+img.w75 {
+  width: 75% !important;
+  height: auto !important;
+  display: block;
+}
+
+img.w50 {
+  width: 50% !important;
+  height: auto !important;
+  display: block;
+}

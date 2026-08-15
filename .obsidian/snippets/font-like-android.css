@@ -1,0 +1,34 @@
+/* Force Android-like font stack */
+/* For: Paleo-Hebrew, primarily. */
+
+body {
+  font-family:
+    "Roboto",
+    "Noto Sans",
+    "Noto Sans Symbols",
+    "Noto Sans Symbols 2",
+    "Noto Sans Cuneiform",
+    "Noto Sans Old Hebrew",
+    "Noto Sans Ancient Scripts",
+    sans-serif;
+}
+
+/* Markdown editor + preview */
+.markdown-source-view,
+.markdown-preview-view {
+  font-family:
+    "Roboto",
+    "Noto Sans",
+    "Noto Sans Symbols",
+    "Noto Sans Symbols 2",
+    "Noto Sans Ancient Scripts",
+    sans-serif;
+}
+
+/* Code */
+code, pre {
+  font-family:
+    "Roboto Mono",
+    "Noto Sans Mono",
+    monospace;
+}

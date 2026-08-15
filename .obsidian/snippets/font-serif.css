@@ -1,0 +1,16 @@
+/* Apply serif font to notes with cssclasses = font-serif */
+
+.font-serif.markdown-preview-view {
+  font-family: serif !important;
+  /*
+  font-family: var(--font-text) !important;
+   */
+}
+
+.font-serif.markdown-source-view .cm-editor,
+.font-serif.markdown-source-view .cm-content {
+  font-family: serif !important;
+  /*
+  font-family: var(--font-text) !important;
+   */
+}

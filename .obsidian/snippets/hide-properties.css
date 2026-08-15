@@ -1,0 +1,5 @@
+/* Hide the entire Properties area in reading (preview) mode */
+.workspace-leaf-content[data-mode="preview"]
+.markdown-preview-view .metadata-container {
+    display: none !important;
+}

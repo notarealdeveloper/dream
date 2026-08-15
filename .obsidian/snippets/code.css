@@ -1,0 +1,67 @@
+/** single-backtick code formatting */
+
+/* make the foreground of single backtick code
+ * formatted text the same as the usual text 
+ * color in reading mode. */
+.markdown-preview-section code {
+    color: var(--text-normal);
+}
+
+/* make editing mode inline `code` backgrounds
+ * visually match how they look in reading mode */
+.cm-inline-code {
+    background-color: var(--pre-code) !important;
+    color: var(--text-normal) !important;
+}
+
+/* make inline code in headings use the heading color */
+.markdown-preview-section h1 code,
+.markdown-preview-section h2 code,
+.markdown-preview-section h3 code {
+    color: inherit !important;
+}
+
+/** triple-backtick code blocks */
+
+/* match editing mode code block background to reading mode */
+.HyperMD-codeblock-bg {
+    background-color: var(--pre-code) !important;
+}
+
+/* match editing mode code block text color to reading mode */
+.HyperMD-codeblock {
+    color: var(--code-block) !important;
+}
+
+/** Reading mode: make fenced code blocks as padded as Live Preview */
+
+:root {
+  /* tweak these until it visually matches Live Preview */
+  --jw-codeblock-pad-y: 0.0em;
+  --jw-codeblock-pad-x: 0.0em;
+}
+
+/* Reading mode only (rendered markdown) */
+.markdown-reading-view .markdown-rendered :is(pre, pre[class*="language-"]),
+.markdown-reading-view .markdown-preview-view :is(pre, pre[class*="language-"]),
+.markdown-preview-view.markdown-rendered :is(pre, pre[class*="language-"]) {
+  padding: var(--jw-codeblock-pad-y) var(--jw-codeblock-pad-x) !important;
+}
+
+/* Some themes put padding on the wrapper instead of <pre> */
+.markdown-reading-view .markdown-rendered :is(.markdown-code-block, .el-pre) {
+  padding-left: var(--jw-codeblock-pad-x) !important;
+  padding-right: var(--jw-codeblock-pad-x) !important;
+}
+
+.markdown-reading-view .markdown-rendered code {
+  padding: 0.25em !important;
+}
+
+/* Live Preview: remove blue indentation / block guide lines in code blocks */
+.markdown-source-view.mod-cm6
+.cm-indent::before,
+.markdown-source-view.mod-cm6
+.cm-block-marker {
+  display: none !important;
+}

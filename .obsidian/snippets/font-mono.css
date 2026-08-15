@@ -1,0 +1,9 @@
+/* Target notes with cssclasses = monospace */
+.font-mono.markdown-preview-view {
+  font-family: var(--font-monospace) !important;
+}
+
+.font-mono.markdown-source-view .cm-editor,
+.font-mono.markdown-source-view .cm-content {
+  font-family: var(--font-monospace) !important;
+}

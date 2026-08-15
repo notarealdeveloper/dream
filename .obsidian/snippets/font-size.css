@@ -1,0 +1,10 @@
+/* Applies to reading preview mode */
+.large-text.markdown-preview-view {
+  font-size: 1.30em !important;
+}
+
+/* Applies to editor/source mode */
+.large-text.markdown-source-view .cm-editor,
+.large-text.markdown-source-view .cm-content {
+  font-size: 1.15em !important;
+}

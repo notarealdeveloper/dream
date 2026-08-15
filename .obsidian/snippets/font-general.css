@@ -1,0 +1,37 @@
+:root {
+  --font-interface:
+    "Noto Sans",
+    "Noto Sans Hebrew",
+    "Noto Sans Phoenician",
+    "Noto Sans Old Italic",
+    "Noto Sans Old Persian",
+    "Noto Sans Ugaritic",
+    "Noto Sans Imperial Aramaic",
+    "Noto Sans Cuneiform",
+    "Noto Sans Egyptian Hieroglyphs",
+    sans-serif;
+
+  --font-text:
+    "Noto Serif",
+    "Noto Serif Hebrew",
+    "Noto Sans Phoenician",
+    "Noto Sans Old Italic",
+    "Noto Sans Old Persian",
+    "Noto Sans Ugaritic",
+    "Noto Sans Imperial Aramaic",
+    "Noto Sans Cuneiform",
+    "Noto Sans Egyptian Hieroglyphs",
+    serif;
+
+  --font-monospace:
+    "Noto Sans Mono",
+    "Noto Sans Hebrew",
+    "Noto Sans Phoenician",
+    "Noto Sans Old Italic",
+    "Noto Sans Old Persian",
+    "Noto Sans Ugaritic",
+    "Noto Sans Imperial Aramaic",
+    "Noto Sans Cuneiform",
+    "Noto Sans Egyptian Hieroglyphs",
+    monospace;
+}

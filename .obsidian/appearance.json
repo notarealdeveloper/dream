@@ -1,0 +1,26 @@
+{
+  "cssTheme": "Everforest",
+  "theme": "obsidian",
+  "accentColor": "",
+  "enabledCssSnippets": [
+    "code",
+    "font-general",
+    "font-mono",
+    "font-phoenician",
+    "font-serif",
+    "font-size",
+    "hide-properties",
+    "howto",
+    "image",
+    "ld",
+    "proto",
+    "tags",
+    "font-like-android"
+  ],
+  "textFontFamily": "Noto Sans",
+  "interfaceFontFamily": "Noto Sans",
+  "monospaceFontFamily": "Noto Sans Mono",
+  "baseFontSize": 16,
+  "baseFontSizeAction": true,
+  "nativeMenus": false
+}

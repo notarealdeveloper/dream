@@ -1,0 +1,28 @@
+.markdown-preview-view,
+.markdown-source-view {
+  font-family: "Noto Sans Phoenician", var(--font-text);
+}
+
+span.phn {
+  font-family: "Noto Sans Phoenician";
+  direction: rtl;
+}
+
+.phn {
+  font-family: "Noto Sans Phoenician";
+  direction: rtl;
+  text-align: right;
+  white-space: pre-wrap;
+}
+
+.phn * {
+  font-family: "Noto Sans Phoenician";
+}
+
+/* This worked VERY well! */
+:lang(phn) {
+    font-family: "Noto Sans Phoenician" !important;
+    /* direction: rtl; */
+    unicode-bidi: isolate;
+    white-space: pre-wrap;
+}

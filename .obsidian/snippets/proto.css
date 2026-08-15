@@ -1,0 +1,11 @@
+@font-face {
+  font-family: "ProtoSina";
+  src: url("../fonts/proto.ttf") format("truetype");
+}
+
+.test-proto {
+  font-family: "ProtoSina" !important;
+  font-feature-settings: "liga" 0;
+  font-size: 40px;
+  border: 1px solid red;
+}
