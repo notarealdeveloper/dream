@@ -1,0 +1,654 @@
+#!/usr/bin/env bash
+
+lord --verbose << "EOF"
+You are working inside a new GitHub repository for a **We the Nameless edition of *Dream of the Red Chamber***.
+
+The repository already contains:
+
+* `./BIBLE/` — a representative working subset of the existing **We the Nameless Bible project**. Treat this as the reference implementation and source of reusable infrastructure.
+* `./zh/` — several Chinese copies/editions of *Dream of the Red Chamber / Honglou Meng / Shi Tou Ji*, including at least one corpus already divided into all 120 chapters.
+* `./en/` — English source material, including the Bencraft translation split across two files.
+* miscellaneous existing `img/`, `com/`, etc.
+
+Your task is **not merely to design or scaffold this project**. Work directly in the repository until there is a plausible, complete first-pass edition of the entire novel that compiles successfully with `make`.
+
+The final state should be a functioning repository for:
+
+**We the Nameless: Dream of the Red Chamber**
+
+with:
+
+1. a root-level `master.tex`,
+2. reusable fonts/macros/build infrastructure selectively extracted and refactored from `./BIBLE/`,
+3. all 120 chapters represented,
+4. the novel divided into two books,
+5. Chinese and English aligned into verse-like units,
+6. at least two source-profile/source-critical categories,
+7. and a root-level `make` that successfully produces the complete first-pass book.
+
+Do not stop after writing scripts or generating a few sample chapters. **Run the scripts, generate the complete book, compile it, fix failures, and continue until the full first-pass build works.**
+
+## 1. Treat `./BIBLE/` as the reference implementation
+
+Begin by inspecting:
+
+* `./BIBLE/master.tex`
+* `./BIBLE/Makefile`
+* several representative chapter `.tex` files
+* any source-key/title/frontmatter machinery referenced by `master.tex`
+* relevant font files under `./BIBLE/fonts/`
+* any small helper scripts or other assets actually required by the build
+
+Do **not** copy the entire `BIBLE` directory into the new project.
+
+Instead, selectively extract and refactor only the pieces useful for making the Dream of the Red Chamber edition.
+
+The new project outside `./BIBLE/` should become independently buildable. `./BIBLE/` remains a reference implementation, not the permanent runtime dependency of the new book unless there is a compelling reason for a very small shared asset.
+
+Prefer copying/refactoring the useful mechanisms into the root project over making the root project depend heavily on paths inside `./BIBLE/`.
+
+Preserve the recognizable visual and structural identity of We the Nameless wherever practical.
+
+## 2. Create a new root `master.tex`
+
+Use `./BIBLE/master.tex` as the primary reference.
+
+Extract and adapt:
+
+* page geometry
+* fonts
+* title/frontmatter machinery
+* `\Verse{}` and related primitives
+* English/source-language panel layout
+* commentary block behavior
+* chapter/book heading machinery
+* source-profile highlighting commands
+* source-key pages
+* any useful indexing/navigation macros
+* other generic We the Nameless formatting infrastructure
+
+Remove or omit Bible-specific machinery that has no useful analogue here.
+
+### The new `\Verse{}` system
+
+The Bible implementation has Hebrew and English panels.
+
+For this project:
+
+* **left panel = English**
+* **right panel = Chinese**
+* **optional block below = commentary**
+
+Keep the overall behavior and appearance of the Bible `\Verse{}` system as closely as practical while adapting it cleanly to Chinese.
+
+Where the Bible source uses Hebrew/source-text commands named like:
+
+```tex
+\hR{...}
+\hE{...}
+\hP{...}
+```
+
+or more generally any `\h?{...}` source-language family, rename/adapt the corresponding Chinese versions to:
+
+```tex
+\zR{...}
+\zE{...}
+\zP{...}
+```
+
+etc.
+
+The principle is:
+
+```text
+h = Hebrew/source language in BIBLE
+z = Chinese/source language here
+e = English
+```
+
+Do not leave Hebrew-specific naming in the new source-language API where it would be misleading.
+
+Chinese must be handled as Unicode Chinese using an appropriate CJK font already available in `BIBLE/fonts/` if possible. Inspect the existing CJK fonts before introducing another dependency.
+
+## 3. Title page
+
+Preserve the current We the Nameless title-page identity from the Bible project.
+
+The cover should prominently retain:
+
+**We the Nameless**
+
+and at the bottom of the cover page add:
+
+**Dream of the Red Chamber**
+
+Use the Bible cover/title implementation as the model rather than redesigning the project from scratch.
+
+## 4. Preserve and adapt the source-key pages
+
+The Bible project contains source-critical/source-profile key pages describing source traditions such as Mushite/Aaronid/etc.
+
+Keep that conceptual and visual machinery, but adapt it to *Dream of the Red Chamber*.
+
+For this first pass, create at least **two source profiles**:
+
+### Author
+
+Represent the primary authorial/narrative stratum.
+
+Give this profile the visual role most closely analogous to whichever Bible source profile is the basic authorial source.
+
+### Redactor / Editor
+
+Represent later editorial/redactional activity.
+
+The **Redactor** should inherit the visual/background treatment corresponding as closely as practical to the existing Bible `\eR{}` and `\hR{}` source profile. In this repository the Chinese equivalent should therefore be something like:
+
+```tex
+\zR{...}
+```
+
+while English remains:
+
+```tex
+\eR{...}
+```
+
+Do not make strong historical claims yet.
+
+The source-key prose can explicitly be placeholder text. It should say, in appropriately cautious terms, that this edition will eventually distinguish possible layers associated with:
+
+* the author or authors of **石頭記 / Shi Tou Ji**
+* later editing/redaction
+* textual development into the received *Honglou Meng / Dream of the Red Chamber*
+
+Avoid pretending the source analysis has already been established.
+
+The source-key layout should be functional now so later scholarship can simply assign verses/passages to different profiles.
+
+## 5. Determine the best Chinese source in `./zh/`
+
+Inspect the available Chinese corpora rather than assuming the first file is best.
+
+There appear to be multiple candidates, including:
+
+* a corpus divided into `chapter-1` through `chapter-120`
+* a Gutenberg Chinese text
+* other HTML/text versions
+
+Compare a representative sample from the beginning, middle, and end of the novel.
+
+Select the source that is most practical and textually complete for this first-pass typeset edition.
+
+Strong preference should be given to a clean 120-chapter source if it is complete and usable.
+
+Document which input was selected and why in a short generated/source-data README or script comment.
+
+Do not spend the project trying to establish a critical Chinese text. This is a first-pass engineering edition.
+
+## 6. Determine and parse the English source in `./en/`
+
+Inspect the English files under `./en/`.
+
+The primary target is the complete Bencraft translation if the two files together contain the 120-chapter translation.
+
+Write reproducible Python tooling that:
+
+1. reads the original English source files,
+2. identifies chapter boundaries,
+3. normalizes Gutenberg/frontmatter noise where appropriate,
+4. emits clean chapter-level intermediate representations,
+5. preserves the original English wording rather than rewriting it.
+
+Do not manually paste the novel into `.tex` files.
+
+The generated edition should be reproducible from the checked-in source texts.
+
+## 7. Split both languages into sentences / alignment units
+
+Write one or more Python scripts under a sensible location such as:
+
+```text
+scripts/
+```
+
+or:
+
+```text
+tools/
+```
+
+The scripts should parse every chapter into candidate sentence-level units.
+
+### Chinese segmentation
+
+At minimum, recognize Chinese sentence punctuation such as:
+
+```text
+。
+！
+？
+；
+```
+
+while handling quotation punctuation and paragraph structure intelligently enough not to create obviously pathological fragments.
+
+Because classical/vernacular Chinese prose and dialogue do not map perfectly onto modern English sentence boundaries, treat these as **candidate alignment units**, not sacred sentence boundaries.
+
+### English segmentation
+
+Split the English translation into sentences while avoiding obvious mistakes around:
+
+* abbreviations
+* initials
+* quotation marks
+* dialogue
+* ellipses
+* chapter headings
+* poetic material where possible
+
+A lightweight custom approach is acceptable. Do not add huge dependencies unless they materially improve reliability.
+
+## 8. Align Chinese and English into verse-like units
+
+This is one of the central tasks.
+
+For each of the 120 chapters, produce a sequence analogous to Bible verses:
+
+```text
+chapter -> verse 1
+        -> verse 2
+        -> verse 3
+        ...
+```
+
+Each verse should contain:
+
+* one Chinese segment or a small group of adjacent Chinese segments,
+* the most plausible corresponding English segment or small group,
+* optional commentary, usually empty in this first pass,
+* a source-profile assignment, initially mostly Author, with Redactor available.
+
+The Chinese and English translations will not have identical sentence counts.
+
+Therefore, **do not align by sentence index alone**.
+
+Implement a reasonable first-pass monotonic alignment system.
+
+### Alignment strategy
+
+You should experimentally inspect many chapter beginnings and representative passages before settling on the heuristic.
+
+Use a combination of signals such as:
+
+* chapter boundaries
+* relative position within the chapter
+* sentence/segment length ratios
+* punctuation
+* dialogue structure
+* proper names
+* transliterated names
+* obvious repeated semantic anchors
+* numbers
+* paragraph boundaries
+* distinctive sentence openings
+* nearby context
+* accumulated length through the chapter
+
+Alignment must remain monotonic:
+
+```text
+Chinese passage order cannot move backward.
+English passage order cannot move backward.
+```
+
+Allow operations such as:
+
+```text
+1 Chinese : 1 English
+1 Chinese : 2 English
+2 Chinese : 1 English
+2 Chinese : 2 English
+1 Chinese : 3 English
+3 Chinese : 1 English
+```
+
+when doing so improves the alignment.
+
+A dynamic-programming alignment over candidate segment groups is encouraged if practical.
+
+You can use cheap lexical/heuristic signals plus relative-length/position penalties.
+
+Do not require perfect machine translation or an external API.
+
+If useful, construct a small bilingual anchor dictionary from recurring names and obvious phrases encountered in the text.
+
+### Important qualitative requirement
+
+Before running the algorithm blindly over all 120 chapters, inspect many samples manually:
+
+* chapter 1
+* several early chapters
+* chapters around 20–40
+* chapters around 50–80
+* chapters around 80–100
+* late chapters
+* chapter 120
+
+Look at Chinese sentence beginnings and the corresponding English sentence beginnings and adjust the heuristics until the correspondence is plausibly useful.
+
+Then run the resulting system over the complete novel.
+
+**Some mismatches are acceptable.**
+
+The goal is not scholarly-perfect alignment. The goal is a **plausible first-pass complete parallel edition** from which individual verses can later be corrected by hand.
+
+Prefer a complete 90%-reasonable alignment over a tiny perfectly curated sample.
+
+## 9. Generate chapter `.tex` files
+
+Generate the book structure from the alignment data.
+
+Use a clean directory organization modeled loosely on the useful parts of `BIBLE`, but appropriate to this novel.
+
+For example, something along the lines of:
+
+```text
+01-book-one/
+    001.tex
+    002.tex
+    ...
+    080.tex
+
+02-book-two/
+    081.tex
+    ...
+    120.tex
+```
+
+The exact split should reflect the traditional authorship/editorial problem where practical.
+
+For this first pass, a very sensible default is:
+
+```text
+Book I: chapters 1–80
+Book II: chapters 81–120
+```
+
+unless inspection of the existing We the Nameless machinery strongly favors another representation.
+
+Give the two books reasonable provisional titles that make the distinction clear without overstating certainty, e.g. something conceptually equivalent to:
+
+```text
+Book I — Shi Tou Ji
+Book II — Later Continuation
+```
+
+but use tact and placeholder language where attribution is uncertain.
+
+Each chapter should contain generated `\Verse{}` structures rather than one giant text blob.
+
+Number verses independently within each chapter.
+
+## 10. Preserve reproducibility
+
+Do not make the generated `.tex` corpus the only record of how the alignment happened.
+
+Keep intermediate structured data, preferably something straightforward like JSON, JSONL, or TSV, containing fields such as:
+
+```text
+book
+chapter
+verse
+zh
+en
+source_profile
+confidence
+```
+
+Optionally include source offsets or original segment indices.
+
+A future editor should be able to:
+
+1. fix one alignment record,
+2. regenerate the `.tex`,
+3. rebuild the book.
+
+If practical, attach a rough alignment confidence score so low-confidence areas can later be reviewed.
+
+## 11. Use source profiles in the generated text
+
+For the initial automatic pass, do not attempt an elaborate literary source-critical reconstruction.
+
+Use at least:
+
+```text
+Author
+Redactor
+```
+
+Most text can initially be assigned to **Author**.
+
+However, make the infrastructure genuinely functional and mark a modest, clearly provisional category of material as Redactor where there is a defensible engineering heuristic—for example explicit chapter framing/editorial formulas, continuation/frontmatter markers, or the later continuation if that is how you decide to model the first pass.
+
+It is acceptable for Book II / chapters 81–120 to receive a provisional redactor/editor/continuator treatment, provided the source-key clearly says this is a working editorial visualization rather than a settled historical conclusion.
+
+The important thing is that both Chinese and English source-profile macros work:
+
+```tex
+\zR{...}
+\eR{...}
+```
+
+and corresponding Author commands.
+
+## 12. Commentary blocks
+
+Retain the optional commentary mechanism from We the Nameless.
+
+Most verses in the generated first pass should simply omit commentary or leave it empty.
+
+Do not fabricate thousands of commentary notes.
+
+The infrastructure merely needs to make it easy to add commentary later.
+
+## 13. Fonts and assets
+
+Selectively copy only the fonts required by the new book.
+
+Likely useful categories include:
+
+* the existing We the Nameless English/title fonts
+* a suitable Chinese CJK font already under `BIBLE/fonts/`
+
+Do not copy dozens of Paleo-Hebrew, Aramaic, Ugaritic, Egyptian, etc. fonts that are irrelevant to this project.
+
+Preserve the relative-path/local-font approach if that is how `BIBLE/master.tex` ensures reproducible builds.
+
+## 14. Makefile and build
+
+Create a root:
+
+```text
+Makefile
+```
+
+modeled on `BIBLE/Makefile`.
+
+The expected workflow should be approximately:
+
+```bash
+make
+```
+
+and should produce the complete PDF.
+
+If useful, expose additional targets such as:
+
+```bash
+make data
+make align
+make tex
+make clean
+```
+
+but `make` itself must work from a clean checkout with the required checked-in source data.
+
+Do not consider the task finished because individual chapters compile.
+
+Build the **entire 120-chapter book**.
+
+Run `make`.
+
+Read the LaTeX errors.
+
+Fix them.
+
+Repeat until the complete first-pass PDF builds successfully.
+
+Pay particular attention to:
+
+* Unicode Chinese
+* CJK fonts
+* TeX-special characters accidentally present in English text
+* `%`
+* `#`
+* `&`
+* `_`
+* `$`
+* braces
+* quotation marks
+* pathological long passages
+* generated empty arguments
+* accidental LaTeX commands appearing in source text
+* page-break behavior
+* missing input files
+* font paths
+
+Implement proper LaTeX escaping in the generator rather than manually patching hundreds of generated files.
+
+## 15. Keep the project small relative to `BIBLE`
+
+The point is to create a **selective offspring of the existing We the Nameless system**, not a second copy of the entire Bible repository.
+
+Before copying something from `BIBLE`, ask:
+
+> Is this actually needed to typeset, build, navigate, source-color, or style Dream of the Red Chamber?
+
+If not, leave it behind.
+
+Useful things should be refactored into the new root project.
+
+Bible-only textual data, Hebrew corpora, irrelevant book directories, ancient-script fonts, maps, etc. should not be duplicated.
+
+## 16. Do not rewrite the source texts
+
+The Chinese text and English translation are source material.
+
+Do not improve their prose.
+
+Do not modernize them.
+
+Do not translate missing passages yourself merely to make alignment easier.
+
+Do not silently delete difficult material.
+
+The alignment layer may group or split passages, but the concatenated Chinese units for a chapter should reproduce the chosen Chinese source content, modulo intentional removal of headings/frontmatter/formatting noise.
+
+Likewise, the concatenated English units should reproduce the selected English translation content for that chapter.
+
+Add validation scripts/tests for this if practical.
+
+## 17. Validate completeness
+
+Before declaring completion, programmatically verify at least:
+
+* exactly 120 chapters were generated,
+* chapters 1 through 120 all exist,
+* every chapter has at least one verse,
+* verse numbering is sequential within each chapter,
+* no Chinese chapter was accidentally omitted,
+* no English chapter was accidentally omitted,
+* the overwhelming majority of source text survives segmentation/alignment,
+* every generated chapter is included in `master.tex`,
+* the two-book division is represented,
+* both Author and Redactor source-profile mechanisms compile,
+* `make` exits successfully.
+
+Also inspect several generated alignments manually after the full run, including chapter 1 and chapter 120.
+
+## 18. Leave useful documentation
+
+Create a concise root `README.md` explaining:
+
+* what this repository is,
+* that it is modeled on We the Nameless,
+* which Chinese source is currently used,
+* which English translation is currently used,
+* how the first-pass sentence alignment works,
+* that alignment is provisional and expected to contain errors,
+* how to build with `make`,
+* how to regenerate data/alignment/TeX,
+* where to correct alignments,
+* how source profiles work.
+
+Do not write a giant design document. The working repository is the main deliverable.
+
+## 19. Working style
+
+You have permission to inspect, modify, create, and run files throughout this repository outside `.git`.
+
+Work iteratively.
+
+Do not ask me to manually choose between trivial implementation alternatives. Inspect the existing system and make sensible choices.
+
+Do not stop after reporting that the corpus is complicated.
+
+Do not stop after producing an alignment prototype.
+
+Do not stop after chapter 1 works.
+
+Do not stop after generating all chapters if the PDF does not compile.
+
+Keep going through implementation, generation, compilation, debugging, and validation.
+
+When a heuristic alignment is imperfect, prefer marking confidence or documenting the limitation rather than abandoning full-book generation.
+
+## Definition of Done
+
+You are finished only when the repository contains a plausible first-pass:
+
+# We the Nameless: Dream of the Red Chamber
+
+with:
+
+* a root `master.tex` derived from and stylistically continuous with `BIBLE/master.tex`,
+* English on the left and Chinese on the right,
+* optional commentary below verses,
+* `\z?{}` Chinese source macros corresponding to the Bible's `\h?{}` family,
+* Author and Redactor source profiles,
+* adapted source-key/frontmatter pages,
+* a We the Nameless cover with **Dream of the Red Chamber** at the bottom,
+* two books,
+* all 120 chapters,
+* automatically generated verse-level Chinese/English alignment,
+* reproducible Python segmentation/alignment/generation scripts,
+* preserved structured alignment data,
+* a concise README,
+* a root Makefile,
+* and a successful complete `make`.
+
+The first-pass bilingual alignment may contain errors. That is acceptable.
+
+An incomplete book is not acceptable.
+
+A non-compiling book is not acceptable.
+
+A design without generated output is not acceptable.
+
+A sample implementation covering only a few chapters is not acceptable.
+
+Use `./BIBLE/` aggressively as the reference implementation, selectively extract its useful machinery, refactor it for Chinese + English, generate the entire novel, and keep working until the complete first-pass edition builds.
+
+EOF
