@@ -1,31 +1,35 @@
+# We the Nameless: Dream of the Red Chamber
 
-## Chinese (zh)
+This repository is a first-pass We the Nameless edition of *Dream of the Red Chamber* / *Honglou Meng* / *Shi Tou Ji*.
 
-### Project Gutenberg (Chinese)
+It is modeled on the local `BIBLE/` reference project, but the root project is independently buildable. The extracted pieces are the page geometry, title/frontmatter identity, source-profile highlighting, and side-by-side verse system.
 
-https://www.gutenberg.org/cache/epub/24264/pg24264.txt
+## Sources
 
+Chinese uses `zh/github-huangtuzhi/chapter-1` through `chapter-120`, selected because it is already a complete 120-chapter corpus with clean chapter files.
 
-## English (en)
+English uses the checked-in H. Bencraft Joly Project Gutenberg files under `en/bencraft/`. Those files currently contain chapters 1-56; chapters after that are represented with Chinese text and explicit source-missing English placeholders. No missing English has been translated or invented.
 
-### Project Gutenberg (English, H. Bencraft Joly, Public Domain)
+## Generation
 
-https://www.gutenberg.org/cache/epub/9603/pg9603.txt
-https://www.gutenberg.org/cache/epub/9604/pg9604.txt
+Run:
 
-### Wikisource
+```sh
+make data
+make
+```
 
-#### Root Url
-https://en.wikisource.org/wiki/Hung_Lou_Meng,_or,_the_Dream_of_the_Red_Chamber_(tr._Joly)
+`scripts/build.py` parses both source corpora, segments Chinese on sentence punctuation, segments English with a lightweight abbreviation-aware splitter, and produces monotonic verse-like alignment records in `data/alignment.jsonl`.
 
-#### Book Urls
-https://en.wikisource.org/wiki/Hung_Lou_Meng,_or,_the_Dream_of_the_Red_Chamber_(tr._Joly)/Book_1
-https://en.wikisource.org/wiki/Hung_Lou_Meng,_or,_the_Dream_of_the_Red_Chamber_(tr._Joly)/Book_2
+The alignment is provisional. It groups adjacent Chinese and English segments by cumulative character mass and bounded 1:1, 1:2, 2:1, 2:2, 1:3, and 3:1 moves. It is meant to produce a complete editable edition, not a final scholarly alignment.
 
-#### Chapter URLs
-https://en.wikisource.org/wiki/Hung_Lou_Meng,_or,_the_Dream_of_the_Red_Chamber_(tr._Joly)/Book_1#PREFACE.
-https://en.wikisource.org/wiki/Hung_Lou_Meng,_or,_the_Dream_of_the_Red_Chamber_(tr._Joly)/Book_1#THE_DREAM_OF_THE_RED_CHAMBER.
-https://en.wikisource.org/wiki/Hung_Lou_Meng,_or,_the_Dream_of_the_Red_Chamber_(tr._Joly)/Book_1#CHAPTER_I.
-https://en.wikisource.org/wiki/Hung_Lou_Meng,_or,_the_Dream_of_the_Red_Chamber_(tr._Joly)/Book_1#CHAPTER_II.
-...
-https://en.wikisource.org/wiki/Hung_Lou_Meng,_or,_the_Dream_of_the_Red_Chamber_(tr._Joly)/Book_2#CHAPTER_XXV
+Correct alignments in `data/alignment.jsonl` or improve `scripts/build.py`, then regenerate with `make data`.
+
+## Source Profiles
+
+The TeX source profiles are functional now:
+
+- `\eA{...}` and `\zA{...}` mark the provisional Author profile.
+- `\eR{...}` and `\zR{...}` mark the provisional Redactor / editor / continuation profile.
+
+This first pass marks chapters 1-80 as Author and chapters 81-120 as Redactor to visualize the traditional authorship/editorial problem cautiously.
