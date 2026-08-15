@@ -1,0 +1,721 @@
+#!/usr/bin/env bash
+
+lord --verbose << "EOF"
+You already have a working first-pass **We the Nameless: Dream of the Red Chamber** repository that:
+
+* builds successfully with `make`,
+* has all 120 chapters,
+* aligns Chinese and English into verse-like units,
+* uses `\Verse{}`-style bilingual layout,
+* and has generated chapter `.tex` files from Python alignment tooling.
+
+Now improve the existing implementation rather than redesigning it.
+
+Your goals are:
+
+1. make the Chinese↔English verse alignment **more accurate**,
+2. make verses **shorter**, with a strong default preference for **one verse per Chinese full stop `。`**,
+3. simplify verse headings to use **石頭記 1:4**-style labels instead of verbose book names,
+4. and add **pytest regression tests** plus a `make check` target that validates known-good properties of the Chinese↔English mapping so future alignment changes do not silently break reliable correspondences.
+
+Do not stop at proposing changes. Modify the code, regenerate the book, run the tests, run `make`, and keep fixing things until both:
+
+```bash
+make check
+make
+```
+
+succeed.
+
+## 1. First inspect the current alignment implementation
+
+Before changing anything, inspect the existing:
+
+* segmentation scripts,
+* alignment/zipping scripts,
+* intermediate JSON/JSONL/TSV alignment data,
+* generated chapter `.tex` files,
+* `master.tex`,
+* `Makefile`,
+* and README.
+
+Understand the current pipeline from:
+
+```text
+zh source + en source
+        ↓
+chapter parsing
+        ↓
+sentence segmentation
+        ↓
+alignment
+        ↓
+structured verse data
+        ↓
+generated .tex
+        ↓
+make
+```
+
+Preserve that basic architecture unless there is a compelling reason to improve it.
+
+Do not replace a working pipeline with an opaque one-off script.
+
+## 2. Make the verse boundaries substantially shorter
+
+The current verse assignment is too coarse.
+
+The new default should be:
+
+> **One verse per Chinese sentence ending in `。` whenever reasonably possible.**
+
+Treat Chinese punctuation as the primary structural signal.
+
+At minimum, Chinese segmentation should strongly recognize:
+
+```text
+。
+！
+？
+```
+
+but `。` should be the dominant/default verse boundary.
+
+The desired result is that most Chinese prose verses contain approximately one Chinese sentence, not several sentences merged together.
+
+### Strong preference
+
+If a Chinese chapter has:
+
+```text
+A。
+B。
+C。
+```
+
+the preferred output is:
+
+```text
+verse 1 = A。
+verse 2 = B。
+verse 3 = C。
+```
+
+not:
+
+```text
+verse 1 = A。B。
+verse 2 = C。
+```
+
+unless there is a very good alignment reason.
+
+### English may span differently
+
+The English translation does not need to have exactly one English sentence per verse.
+
+For a Chinese verse corresponding to one `。`-terminated sentence, the English side may contain:
+
+* part of one sentence,
+* one complete sentence,
+* multiple short English sentences,
+* or occasionally no clean standalone sentence boundary,
+
+provided the semantic alignment is better.
+
+In other words:
+
+> **Prefer Chinese punctuation for verse boundaries; let English grouping adapt to the Chinese.**
+
+Do not force Chinese units to become long just because the English translation uses longer sentences.
+
+## 3. Improve alignment accuracy
+
+The existing first pass was intentionally approximate. Now improve it.
+
+Do not simply reduce segment size and zip by index.
+
+The alignment should remain monotonic and should consider groups of neighboring English segments.
+
+For each Chinese sentence-sized verse, choose the most plausible corresponding English span.
+
+Use whatever combination of the existing signals and improved signals works best, such as:
+
+* relative chapter position,
+* accumulated character/word progress,
+* length ratio,
+* paragraph boundaries,
+* quotation/dialogue structure,
+* character names,
+* place names,
+* family names,
+* titles,
+* repeated distinctive nouns,
+* numbers,
+* obvious translated terms,
+* punctuation,
+* chapter opening formulas,
+* chapter closing formulas,
+* nearby already-confident alignments.
+
+Inspect real examples across many chapters while tuning.
+
+At minimum, manually inspect samples from:
+
+```text
+1
+2
+5
+10
+20
+40
+60
+80
+81
+100
+119
+120
+```
+
+and preferably more.
+
+The alignment must stay monotonic:
+
+```text
+Chinese never moves backward.
+English never moves backward.
+```
+
+Allow variable English grouping such as:
+
+```text
+1 zh : 1 en
+1 zh : 2 en
+1 zh : 3 en
+2 zh : 1 en
+```
+
+but because we now strongly prefer one Chinese `。` sentence per verse, prefer changing the **English grouping** rather than merging Chinese sentences.
+
+If useful, use dynamic programming over Chinese sentence units versus candidate English spans.
+
+## 4. Prefer sentence-level Chinese even when alignment confidence is imperfect
+
+Do not solve difficult alignment regions by aggressively merging many Chinese sentences.
+
+A low-confidence short verse is better than a falsely confident giant verse.
+
+If necessary, retain or improve the alignment confidence field.
+
+For difficult regions, it is acceptable to produce something like:
+
+```text
+zh = one Chinese sentence
+en = best nearby English span
+confidence = low
+```
+
+because future manual editing can fix it.
+
+The important invariant is that the Chinese verse structure remains fine-grained.
+
+## 5. Preserve all text
+
+Continue validating that segmentation/alignment does not silently drop source material.
+
+For each chapter, concatenating the normalized Chinese verse text should reproduce the normalized chosen Chinese source.
+
+Likewise, concatenating the aligned English spans should reproduce the intended chapter English source, modulo intentional removal of headings/frontmatter.
+
+Add automated checks for this if they do not already exist.
+
+## 6. Simplify verse headings
+
+The visible verse heading should no longer say things like:
+
+```text
+Book I – Shi Tou Ji 1:4
+```
+
+Instead, use the compact form:
+
+```text
+石頭記 1:4
+```
+
+for the first part/book.
+
+The goal is the visual analogy of:
+
+```text
+Genesis 1:4
+```
+
+rather than including the volume hierarchy in every verse label.
+
+### Book I / Book II naming
+
+If the project internally distinguishes two books, keep that structure internally.
+
+You may also give the second book an appropriate Chinese display name if useful.
+
+For example, something along the conceptual lines of:
+
+```text
+石頭記
+後四十回
+```
+
+or another restrained, historically sensible Chinese label.
+
+Do not overstate authorship certainty.
+
+The visible verse heading should remain short.
+
+Examples of acceptable display forms:
+
+```text
+石頭記 1:4
+石頭記 37:12
+後四十回 81:3
+```
+
+or, if consistency is cleaner:
+
+```text
+石頭記 1:4
+石頭記 81:3
+```
+
+with book distinction handled elsewhere.
+
+Choose the cleanest approach that fits the current architecture.
+
+But remove verbose headings like:
+
+```text
+Book I – Shi Tou Ji 1:4
+```
+
+from every verse.
+
+## 7. Add a real pytest regression suite
+
+Create a proper test suite, preferably:
+
+```text
+tests/
+```
+
+using `pytest`.
+
+Add `pytest` as a development/build dependency in whatever way best fits the repository.
+
+The tests should validate the alignment pipeline, not just superficial file existence.
+
+The purpose is:
+
+> If someone changes the segmentation/alignment algorithm later, confidently known Chinese↔English correspondences should remain true unless deliberately updated.
+
+## 8. Build a set of confidently known bilingual anchor assertions
+
+Inspect the actual Chinese and English source texts and identify a modest but useful set of **high-confidence translation anchors**.
+
+Do not guess these.
+
+Read the source material and find examples whose correspondence is unmistakable.
+
+Choose anchors across the whole novel, not only chapter 1.
+
+Aim for perhaps 15–30 strong regression anchors spread across:
+
+* early chapters,
+* middle chapters,
+* around chapter 80/81,
+* late chapters,
+* chapter 120.
+
+Good candidates are passages involving distinctive names or phrases where the Chinese and English correspondence is unambiguous.
+
+For example, assertions may conceptually look like:
+
+```python
+assert zh_verse_contains(chapter=1, text="甄士隱")
+assert corresponding_en_contains(chapter=1, zh_text="甄士隱", text="Chen Shih-yin")
+```
+
+or whatever spelling the actual Bencraft translation uses.
+
+Use the spelling actually present in the repository.
+
+Other useful anchors might involve unmistakable names such as:
+
+```text
+賈寶玉
+林黛玉
+薛寶釵
+王熙鳳
+賈雨村
+甄士隱
+```
+
+but only create assertions after confirming exactly how the English translation renders them.
+
+Prefer distinctive passages over generic words.
+
+## 9. Tests should validate mapping relationships, not exact verse numbers whenever possible
+
+Do not make the tests unnecessarily brittle.
+
+Since the purpose of this work is to improve verse boundaries, a future refinement may legitimately change:
+
+```text
+chapter 3 verse 18
+```
+
+into:
+
+```text
+chapter 3 verse 19
+```
+
+Therefore, most semantic regression tests should not require exact verse numbers unless the numbering itself is the thing being tested.
+
+Instead, test invariants like:
+
+```python
+match = find_alignment_containing_zh(chapter=3, substring="林黛玉")
+assert "Lin" in match.en
+```
+
+or:
+
+```python
+matches = find_alignments(chapter=5, zh_contains="太虛幻境")
+assert any("Dream" in m.en or "Illusion" in m.en for m in matches)
+```
+
+using the actual translation wording.
+
+The important assertion is:
+
+> These two pieces of text still align to one another or to directly adjacent verse units.
+
+If a known translation spans adjacent verses, allow a small local window.
+
+For example:
+
+```python
+assert english_near_zh_anchor(
+    chapter=1,
+    zh="甄士隱",
+    en="Chen Shih-yin",
+    max_verse_distance=1,
+)
+```
+
+This is much better than asserting an exact verse number.
+
+## 10. Add structural tests for short Chinese verses
+
+Add tests enforcing the new verse philosophy.
+
+For example, compute metrics such as:
+
+```python
+fraction_with_one_full_stop
+fraction_with_multiple_full_stops
+max_full_stops_per_verse
+median_chinese_length
+```
+
+Then add sensible assertions.
+
+Do not require literally 100% one-`。` verses, because poetry, dialogue, punctuation anomalies, and source formatting may require exceptions.
+
+But enforce a strong threshold.
+
+For example, after inspecting the actual corpus, establish a reasonable invariant conceptually like:
+
+```python
+assert fraction_of_prose_verses_with_at_most_one_full_stop > 0.90
+```
+
+or better if achievable.
+
+Likewise:
+
+```python
+assert fraction_with_three_or_more_full_stops < 0.01
+```
+
+Choose thresholds based on the improved output, not arbitrary fantasy numbers.
+
+The tests should prevent a future algorithm from silently reverting to huge multi-sentence verses.
+
+## 11. Add chapter-level alignment sanity tests
+
+Add tests for every chapter that verify basic health:
+
+```python
+assert chapter.zh_verses
+assert chapter.en_text
+assert chapter.alignments
+```
+
+and stronger checks such as:
+
+* Chinese source coverage is near 100%.
+* English source coverage is near 100%.
+* verse numbers are sequential.
+* no empty Chinese verse exists.
+* no pathologically giant verse exists except a documented exception.
+* mappings are monotonic.
+* source indices never move backward.
+* every chapter 1–120 exists.
+
+If structured alignment records have fields like:
+
+```text
+zh_start
+zh_end
+en_start
+en_end
+```
+
+assert monotonicity directly.
+
+## 12. Test punctuation preservation
+
+Add tests that verify Chinese segmentation preserves punctuation.
+
+A Chinese sentence ending in `。` should generally still contain the `。` in the verse text unless there is a deliberate normalization rule.
+
+Test that segmentation followed by concatenation reconstructs the normalized original text.
+
+This should catch accidental dropped punctuation or skipped text.
+
+## 13. Test chapter boundary anchors
+
+Find a few unmistakable opening and/or closing phrases from selected chapters.
+
+Add assertions that:
+
+```python
+chapter[0].zh
+```
+
+or the first few verses contain the expected opening Chinese text, and that the corresponding English opening is nearby.
+
+Likewise for selected chapter endings.
+
+This is useful because chapter-offset bugs can produce globally plausible but chapter-shifted alignments.
+
+Include tests on both sides of the traditional 80/81 boundary.
+
+## 14. Create helper APIs for tests
+
+Do not write 30 tests that manually parse raw JSON in slightly different ways.
+
+Create small reusable test helpers, for example:
+
+```python
+load_chapter(chapter)
+find_zh(chapter, substring)
+find_en(chapter, substring)
+find_alignment_by_zh(...)
+english_window(...)
+normalized_chinese(...)
+normalized_english(...)
+```
+
+Keep them simple.
+
+The tests should be readable enough that a future editor can add a new bilingual anchor in a few lines.
+
+## 15. Add `make check`
+
+Update the root `Makefile` so:
+
+```bash
+make check
+```
+
+runs the full validation suite.
+
+At minimum:
+
+```bash
+pytest
+```
+
+plus any existing validation scripts that should remain separate.
+
+If generated alignment data is required before testing, make the dependency clear and deterministic.
+
+Ideally:
+
+```bash
+make check
+```
+
+works from a normal checkout after the standard generated data is present.
+
+If regeneration is cheap enough and deterministic, it may regenerate first.
+
+Do not make `make check` rebuild the entire PDF unless necessary.
+
+## 16. Separate invariant tests from snapshot tests
+
+Avoid simply snapshotting the entire generated JSON and asserting byte-for-byte equality.
+
+That would make legitimate improvements painful.
+
+Prefer tests of meaningful invariants:
+
+* text preservation,
+* monotonic alignment,
+* short Chinese verse boundaries,
+* known bilingual anchors,
+* chapter correctness,
+* semantic neighborhood consistency.
+
+A small snapshot of specifically curated known-good anchors is fine, but not a snapshot of the entire book.
+
+## 17. Improve the alignment iteratively using the tests
+
+Once the first regression tests exist:
+
+1. run them on the current alignment,
+2. identify obvious failures or weak spots,
+3. improve the alignment algorithm,
+4. regenerate,
+5. rerun tests,
+6. inspect representative chapters manually,
+7. repeat.
+
+Do not weaken a meaningful test merely because the algorithm fails it.
+
+If the test itself was based on a mistaken assumption, correct the test only after checking the source texts.
+
+## 18. Manually inspect verse-size distribution
+
+After regeneration, produce a brief diagnostic report during development showing things such as:
+
+```text
+total verses
+median zh chars / verse
+mean zh chars / verse
+% verses with 0 "。"
+% verses with 1 "。"
+% verses with 2 "。"
+% verses with 3+ "。"
+longest verses
+lowest-confidence alignments
+```
+
+This report can be a script output and does not need to be part of the PDF.
+
+Use it to identify chapters where segmentation is still too coarse.
+
+Inspect outliers and fix systematic causes.
+
+## 19. Do not blindly split poetry
+
+Be careful with embedded poems, couplets, chapter titles, inscriptions, and other non-prose material.
+
+For ordinary prose:
+
+```text
+one `。` ≈ one verse
+```
+
+is the strong default.
+
+For verse/poetry or unusual typography, preserve sensible literary units rather than mechanically producing nonsense.
+
+Document any special segmentation rules in code comments.
+
+## 20. Keep generated TeX stable and clean
+
+After changing verse boundaries, regenerate all 120 chapters.
+
+Ensure the generator:
+
+* escapes LaTeX correctly,
+* still applies `\zA`, `\zR`, `\eA`, `\eR`, or equivalent source macros correctly,
+* produces sequential verse numbering,
+* emits compact headings,
+* does not duplicate text,
+* does not drop text,
+* and compiles.
+
+Do not manually patch generated chapter files unless the pipeline explicitly supports manual overrides.
+
+If human overrides are needed, add an override mechanism in structured data or code.
+
+## 21. Update README
+
+Briefly document:
+
+* that Chinese `。` is now the preferred verse boundary,
+* that English is aligned flexibly against those Chinese units,
+* that alignment remains provisional,
+* how to run:
+
+```bash
+make check
+```
+
+* where regression anchors live,
+* how to add a new known-good Chinese↔English assertion,
+* and how to regenerate the aligned text.
+
+Keep this concise.
+
+## 22. Completion criteria
+
+Do not stop when the test files exist.
+
+You are finished only when:
+
+```bash
+make check
+```
+
+passes,
+
+and:
+
+```bash
+make
+```
+
+still successfully builds the complete book.
+
+The improved repository should have:
+
+* noticeably shorter verses,
+* ordinary prose overwhelmingly close to one Chinese `。` sentence per verse,
+* better Chinese↔English correspondence than the previous first pass,
+* compact headings such as:
+
+```text
+石頭記 1:4
+```
+
+* regression tests based on genuinely inspected, confidently known Chinese↔English correspondences,
+* structural tests preventing coarse multi-sentence verse regressions,
+* monotonicity and text-preservation tests,
+* tests spanning early, middle, 80/81 boundary, and late chapters,
+* and a working `make check`.
+
+Do the work directly in the repository.
+
+Inspect the source texts carefully when creating bilingual assertions.
+
+Use the tests to make the alignment safer, not merely more frozen.
+
+Keep iterating until both the alignment quality and the test suite are meaningfully improved and the full project still builds.
+
+EOF
